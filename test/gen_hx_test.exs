@@ -6,16 +6,18 @@ defmodule GenHxTest do
     data
   end
 
-  test "starts" do
-    defmodule TestCache.Starts do
+  test "initialises" do
+    defmodule TestCache.Inits do
       use GenHx.Cache
       def fetch_data(), do: :fetched
       def broadcast(_), do: nil
     end
 
-    {:ok, pid} = TestCache.Starts.start_link([])
+    {:ok, pid} = TestCache.Inits.start_link([])
 
     assert :fetched = get_state(pid)
+
+    assert :fetched = TestCache.Inits.get_all()
 
     GenServer.stop(pid)
   end
@@ -31,7 +33,7 @@ defmodule GenHxTest do
 
     t1 = get_state(pid)
     :timer.sleep(1)
-    t2 = get_state(pid)
+    t2 = TestCache.Refresh.get_all()
 
     GenServer.stop(pid)
 
@@ -54,6 +56,8 @@ defmodule GenHxTest do
     receive do
       :hello -> nil
     end
+
+    assert :hello = TestCache.Broadcast.get_all()
 
     GenServer.stop(pid)
   end
