@@ -1,8 +1,60 @@
 defmodule GenHxTest do
   use ExUnit.Case
-  doctest GenHx
 
-  test "greets the world" do
-    assert GenHx.hello() == :world
+  defp get_state(pid) do
+    %{accessed: false, data: data, data_status: :hot} = :sys.get_state(pid)
+    data
+  end
+
+  test "starts" do
+    defmodule TestCache.Starts do
+      use GenHx.Cache
+      def fetch_data(), do: :fetched
+      def broadcast(_), do: nil
+    end
+
+    {:ok, pid} = TestCache.Starts.start_link([])
+
+    assert :fetched = get_state(pid)
+
+    GenServer.stop(pid)
+  end
+
+  test "refresh" do
+    defmodule TestCache.Refresh do
+      use GenHx.Cache, refresh_milliseconds: 1
+      def fetch_data(), do: NaiveDateTime.utc_now()
+      def broadcast(_), do: nil
+    end
+
+    {:ok, pid} = TestCache.Refresh.start_link([])
+
+    t1 = get_state(pid)
+    :timer.sleep(1)
+    t2 = get_state(pid)
+
+    GenServer.stop(pid)
+
+    assert NaiveDateTime.diff(t2, t1, :millisecond) > 0
+  end
+
+  test "broadcast" do
+    defmodule TestCache.Broadcast do
+      use GenHx.Cache, refresh_milliseconds: 1
+      def fetch_data(), do: :hello
+
+      def broadcast(data) do
+        [pid] = Process.info(self())[:dictionary][:"$ancestors"]
+        send(pid, data)
+      end
+    end
+
+    {:ok, pid} = TestCache.Broadcast.start_link([])
+
+    receive do
+      :hello -> nil
+    end
+
+    GenServer.stop(pid)
   end
 end
