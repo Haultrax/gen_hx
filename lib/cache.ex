@@ -82,7 +82,7 @@ defmodule GenHx.Cache do
       end
 
       defp schedule_refresh(nil), do: nil
-      defp schedule_refresh(refresh_time), do: Process.send_after(self(), :refresh, refresh_time)
+      defp schedule_refresh(refresh_time), do: Process.send_after(__MODULE__, :refresh, refresh_time)
 
       defp run({m, f, a}, extra), do: apply(m, f, extra ++ a)
       defp run(fun, extra), do: apply(fun, extra)
