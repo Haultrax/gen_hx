@@ -31,27 +31,38 @@ defmodule GenHx.Cache do
       end
 
       defp do_refresh(state) do
-        state =
-          case fetch_data() do
-            :reuse_old_data ->
-              %{state | data_status: :cold}
-
-            data ->
-              if Kernel.function_exported?(__MODULE__, :broadcast, 1) do
-                apply(__MODULE__, :broadcast, [data])
-              end
-
-              %{data: data, data_status: :hot, accessed: false}
-          end
-
+        state = do_fetch_data(state)
         schedule_refresh(unquote(refresh_milliseconds))
         {:noreply, state}
+      end
+
+      defp do_fetch_data(state) do
+        case fetch_data() do
+          :reuse_old_data ->
+            %{state | data_status: :cold}
+
+          data ->
+            if Kernel.function_exported?(__MODULE__, :broadcast, 1) do
+              apply(__MODULE__, :broadcast, [data])
+            end
+
+            %{data: data, data_status: :hot, accessed: false}
+        end
       end
 
       def handle_call({:get, fun}, _from, state) do
         reply = run(fun, [state.data])
         state = %{state | accessed: true}
         {:reply, reply, state}
+      end
+
+      def handle_call(:refresh, _from, state) do
+        state = do_fetch_data(state)
+
+        case state.data_status do
+          :hot -> {:reply, :ok, state}
+          :cold -> {:reply, {:error, :reusing_old_data}, state}
+        end
       end
 
       def get_all(timeout \\ 5000), do: get(& &1, timeout)
@@ -64,6 +75,10 @@ defmodule GenHx.Cache do
 
       def get(key, timeout) when is_atom(key) do
         get(& &1[key], timeout)
+      end
+
+      def refresh(timeout \\ 5000) do
+        GenServer.call(__MODULE__, :refresh, timeout)
       end
 
       defp schedule_refresh(nil), do: nil
