@@ -7,7 +7,7 @@ defmodule GenHx.Cache do
       use GenHx
 
       @behaviour GenHx.Cache
-      @error_timeout 1000
+      @error_timeout 30_000
 
       refresh_milliseconds = Keyword.get(opts, :refresh_milliseconds)
       always_refresh = Keyword.get(opts, :always_refresh, true)
