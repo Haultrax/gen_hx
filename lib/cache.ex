@@ -7,12 +7,18 @@ defmodule GenHx.Cache do
       use GenHx
 
       @behaviour GenHx.Cache
+      @error_timeout 1000
 
       refresh_milliseconds = Keyword.get(opts, :refresh_milliseconds)
       always_refresh = Keyword.get(opts, :always_refresh, true)
 
+      def init(nil) do
+        schedule_refresh(unquote(refresh_milliseconds), nil)
+        {:ok, %{data: nil, data_status: :cold, accessed: true}}
+      end
+
       def init(data) do
-        schedule_refresh(unquote(refresh_milliseconds))
+        schedule_refresh(unquote(refresh_milliseconds), data)
         {:ok, %{data: data, data_status: :hot, accessed: false}}
       end
 
@@ -24,7 +30,7 @@ defmodule GenHx.Cache do
             do_refresh(state)
           else
             %{state | data_status: :cold}
-            schedule_refresh(unquote(refresh_milliseconds))
+            schedule_refresh(unquote(refresh_milliseconds), state.data)
             {:noreply, state}
           end
         end
@@ -32,7 +38,7 @@ defmodule GenHx.Cache do
 
       defp do_refresh(state) do
         state = do_fetch_data(state)
-        schedule_refresh(unquote(refresh_milliseconds))
+        schedule_refresh(unquote(refresh_milliseconds), state.data)
         {:noreply, state}
       end
 
@@ -81,9 +87,11 @@ defmodule GenHx.Cache do
         GenServer.call(__MODULE__, :refresh, timeout)
       end
 
-      defp schedule_refresh(nil), do: nil
-      defp schedule_refresh(refresh_time), do: Process.send_after(__MODULE__, :refresh, refresh_time)
+      defp schedule_refresh(_, nil), do: Process.send_after(__MODULE__, :refresh, @error_timeout)
+      defp schedule_refresh(nil, _), do: nil
+      defp schedule_refresh(refresh_time, _), do: Process.send_after(__MODULE__, :refresh, refresh_time)
 
+      defp run(_, nil), do: []
       defp run({m, f, a}, extra), do: apply(m, f, extra ++ a)
       defp run(fun, extra), do: apply(fun, extra)
 

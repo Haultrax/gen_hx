@@ -4,8 +4,6 @@ defmodule GenHx do
       use GenServer
       require Logger
 
-      @error_timeout 1000
-
       child_spec_opts = Keyword.get(opts, :child_spec_opts, [])
 
       def child_spec(arg) do
@@ -24,8 +22,7 @@ defmodule GenHx do
           error ->
             Logger.error(inspect(error))
             Logger.warn("waiting to initialise #{__MODULE__}")
-            :timer.sleep(@error_timeout)
-            start_link(opts)
+            GenServer.start_link(__MODULE__, nil, name: __MODULE__)
         else
           data -> GenServer.start_link(__MODULE__, data, name: __MODULE__)
         end
